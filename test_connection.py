@@ -1,55 +1,57 @@
-# test_connection.py
+# test_connection.py (mac-ready, IPv6 aware)
 import os, sys, socket, urllib.parse
 import psycopg2, pandas as pd, requests
 from dotenv import load_dotenv
-import socket
-socket.setdefaulttimeout(10)
-socket.AF_UNSPEC = socket.AF_INET  # paksa IPv4 (kadang bisa bypass)
 
 load_dotenv()
+PG_CONN = os.getenv("PG_CONN","")
+SUPABASE_URL = os.getenv("SUPABASE_URL","")
 
-PG_CONN = os.getenv("PG_CONN", "")
-SUPABASE_URL = os.getenv("SUPABASE_URL", "")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
+def host_from_conn(s):
+    p = urllib.parse.urlparse(s.replace("postgresql://","http://",1))
+    return p.hostname
 
-print("🔗 PG_CONN:", PG_CONN or "(missing)")
-print("🔗 SUPABASE_URL:", SUPABASE_URL or "(missing)")
+def can_resolve(host):
+    try:
+        # getaddrinfo mengembalikan IPv4/IPv6; cukup bukti DNS OK
+        info = socket.getaddrinfo(host, None)
+        fams = {i[0] for i in info}
+        return True, ("IPv6" if socket.AF_INET6 in fams else "IPv4/IPv6"), info[0][4][0]
+    except Exception as e:
+        return False, str(e), None
 
-# 1) Parse host dari PG_CONN dan cek DNS
-try:
-    parsed = urllib.parse.urlparse(PG_CONN.replace("postgresql://", "http://", 1))
-    host = parsed.hostname
-    print("🌐 Host parsed:", host)
-    if not host:
-        raise ValueError("Host tidak bisa diparse dari PG_CONN.")
-    ip = socket.gethostbyname(host)
-    print("🌐 DNS resolve OK →", ip)
-except Exception as e:
-    print("❌ DNS resolve gagal:", e)
-    print("👉 Coba ganti DNS ke 1.1.1.1/8.8.8.8 atau test via hotspot.")
+print("PG_CONN:", PG_CONN or "(missing)")
+print("SUPABASE_URL:", SUPABASE_URL or "(missing)")
+
+host = host_from_conn(PG_CONN) if PG_CONN else None
+print("DB Host:", host)
+
+ok, fam, ip = can_resolve(host) if host else (False,"no-host",None)
+if not ok:
+    print("❌ DNS gagal:", fam)
     sys.exit(1)
+print(f"🌐 DNS OK → {ip} ({fam})")
 
-# 2) REST ping (cek project ref valid)
+# optional ping REST untuk validasi project ref
 if SUPABASE_URL:
     try:
         r = requests.get(f"{SUPABASE_URL}/rest/v1/", timeout=10)
-        print("🌍 REST ping:", SUPABASE_URL, "→ status", r.status_code)
+        print("REST ping:", SUPABASE_URL, "→", r.status_code)
     except Exception as e:
-        print("⚠️  REST ping gagal:", e)
+        print("REST ping gagal:", e)
 
-# 3) Koneksi Postgres
-print("\n=== Test koneksi PostgreSQL ===")
+print("\n=== PostgreSQL connect ===")
 try:
     with psycopg2.connect(PG_CONN) as conn:
         cur = conn.cursor()
-        cur.execute("SELECT current_database(), current_user, version();")
-        print("✅ DB Info:", cur.fetchone())
+        cur.execute("select current_database(), current_user, version();")
+        print("✅", cur.fetchone())
         try:
-            df = pd.read_sql_query("SELECT COUNT(*) AS n FROM core.employees;", conn)
-            print("📦 core.employees rows:", int(df.loc[0, "n"]))
+            df = pd.read_sql_query("select count(*) n from core.employees;", conn)
+            print("core.employees rows:", int(df.loc[0,"n"]))
         except Exception as e:
             print("ℹ️  core.employees belum ada / belum terisi:", e)
 except Exception as e:
-    print("❌ Gagal konek ke Postgres:", e)
-    print("👉 Pastikan ?sslmode=require dan port 5432 tidak diblok firewall.")
+    print("❌ Connect error:", e)
+    print("Tips: pastikan ?sslmode=require, dan IPv6 port 5432 tidak diblok firewall/router.")
     sys.exit(1)
