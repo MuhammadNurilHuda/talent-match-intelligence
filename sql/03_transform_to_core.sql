@@ -96,7 +96,7 @@ WITH se_raw AS (
   WHERE NULLIF(TRIM(employee_id),'') IS NOT NULL
 ),
 se AS (
-  -- Dedup bila if there're double employee
+  -- Dedup if there're double employee
   SELECT *, ROW_NUMBER() OVER (PARTITION BY employee_id ORDER BY employee_id) AS rn
   FROM se_raw
 )
@@ -229,7 +229,7 @@ ON CONFLICT (employee_id, pillar_code, year) DO UPDATE SET score = EXCLUDED.scor
 
 COMMIT;
 
--- Quick report: jumlah rows inti
+-- Quick report: total core rows
 SELECT 'dim_companies' tbl, COUNT(*) n FROM core.dim_companies
 UNION ALL SELECT 'dim_areas', COUNT(*) FROM core.dim_areas
 UNION ALL SELECT 'dim_positions', COUNT(*) FROM core.dim_positions
@@ -248,7 +248,7 @@ UNION ALL SELECT 'performance_yearly', COUNT(*) FROM core.performance_yearly
 UNION ALL SELECT 'competencies_yearly', COUNT(*) FROM core.competencies_yearly
 ORDER BY 1;
 
--- Orphan check (harus 0 semua)
+-- Orphan check (must 0 all)
 WITH x AS (
   SELECT
     SUM((company_id     IS NULL)::int) AS miss_company,
