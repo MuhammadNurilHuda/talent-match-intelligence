@@ -1,3 +1,12 @@
+.DS_Store
+
 # env
 .env
 .venv/
+
+# core
+core/queries.py
+core/io.py
+
+# cache
+core/__pycache__/*
