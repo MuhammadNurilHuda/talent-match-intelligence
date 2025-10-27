@@ -29,6 +29,13 @@ def _safe_get_cols(df: pd.DataFrame, keep: list[str]) -> pd.DataFrame:
             out[k] = 0.0
     return out
 
+# --- minmax helper for v1/v2 API --- #
+def _minmax01(s: pd.Series) -> pd.Series:
+    lo, hi = s.min(), s.max()
+    if pd.isna(lo) or pd.isna(hi) or hi == lo:
+        return pd.Series(0.0, index=s.index)
+    return (s - lo) / (hi - lo)
+
 # ---------------------- builder komponen ---------------------- #
 def build_competency_component(df_comp_wide: pd.DataFrame,
                                weights_comp: dict[str, float]) -> pd.DataFrame:
@@ -110,6 +117,90 @@ def combine_score(components: pd.DataFrame, w_main: dict[str, float]) -> pd.Data
     )
     keep = ["employee_id","success_score","comp_score","str_score","psy_score","ctx_adj"]
     return df[keep]
+
+
+# --- v1 API compatible with v2: returns (score_series, parts_df) --- #
+def success_score_v1(
+    df_comp_wide: pd.DataFrame,
+    df_strengths: pd.DataFrame,
+    df_psych: pd.DataFrame,
+    df_papi_wide: pd.DataFrame,
+    df_emp_org: pd.DataFrame,
+    weights_comp: dict[str, float] | None = None,
+    weights_psych: dict[str, float] | None = None,
+    weights_strengths: dict[str, float] | None = None,
+    w_main: dict[str, float] | None = None,
+    minmax: bool = True,
+):
+    """
+    Versi API v1 yang kompatibel dengan v2: mengembalikan (success_score_series, parts_df).
+    Menggunakan builder v1 yang sudah ada serta bobot default v1 agar backward compatible.
+    """
+    # default weights (sesuai v1)
+    if weights_comp is None:
+        weights_comp = {
+            "SEA":0.22, "CEX":0.17, "VCU":0.12, "STO":0.12, "CSI":0.11,
+            "QDD":0.08, "GDR":0.07, "LIE":0.05, "IDS":0.03, "FTC":0.03,
+        }
+    if weights_psych is None:
+        weights_psych = {"pauli":0.6, "Papi_P":0.3, "Papi_S":-0.05, "Papi_G":-0.05}
+    if weights_strengths is None:
+        weights_strengths = {"Futuristic":0.40, "Intellection":0.35, "Context":0.25}
+    if w_main is None:
+        w_main = {"competency":0.50, "strengths":0.25, "psychometric":0.15, "context":0.10}
+
+    # build parts (aman untuk missing kolom)
+    comp_part = build_competency_component(df_comp_wide, weights_comp)
+    psy_part  = build_psych_component(df_psych, df_papi_wide, weights_psych)
+    str_part  = build_strengths_component(df_strengths, weights_strengths)
+    ctx_part  = build_context_adjuster(df_emp_org, yos_threshold_years=10.0, uplift=0.05)
+
+    parts = (
+        comp_part.merge(psy_part, on="employee_id", how="outer")
+                 .merge(str_part, on="employee_id", how="outer")
+                 .merge(ctx_part, on="employee_id", how="outer")
+                 .fillna(0.0)
+    )
+
+    scored = combine_score(parts, w_main)
+    score_series = scored.set_index("employee_id")["success_score"]
+    if minmax:
+        score_series = _minmax01(score_series).rename("success_score")
+
+    # kembalikan series + parts (tanpa duplikasi kolom success_score)
+    return score_series, parts
+
+
+# --- wrapper for direct call from core.io, v1 API with v2 signature --- #
+def compute_success_v1_from_fetchers(io_module,
+                                     weights_comp_default: dict[str, float] | None = None,
+                                     weights_psych_default: dict[str, float] | None = None,
+                                     weights_strengths_default: dict[str, float] | None = None,
+                                     w_main: dict[str, float] | None = None,
+                                     minmax: bool = True):
+    """Wrapper aman: fetch semua input dari core.io dan kembalikan (score_series, parts_df, perf_df)."""
+    comp_wide = io_module.fetch_competency_wide_latest()
+    papi_wide = io_module.fetch_papi_wide()
+    psych     = io_module.fetch_psych()
+    try:
+        emp_org = io_module.fetch_employees_org()
+    except Exception:
+        emp_org = io_module.fetch_employees_org_min()
+    try:
+        strengths = io_module.read_sql("SELECT employee_id, rank, theme FROM core.strengths;")
+    except Exception:
+        strengths = pd.DataFrame(columns=["employee_id","rank","theme"])
+
+    score_series, parts = success_score_v1(
+        comp_wide, strengths, psych, papi_wide, emp_org,
+        weights_comp=weights_comp_default,
+        weights_psych=weights_psych_default,
+        weights_strengths=weights_strengths_default,
+        w_main=w_main,
+        minmax=minmax,
+    )
+    perf = io_module.fetch_perf_latest()
+    return score_series, parts, perf
 
 def compute_success_score_from_fetchers(
     io_module,
