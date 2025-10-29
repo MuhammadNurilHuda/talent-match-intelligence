@@ -1,3 +1,32 @@
+/*
+  File: 03_transform_to_core.sql
+  ------------------------------
+  Purpose:
+    Transform and migrate data from the staging schema to the core schema.
+
+  Responsibilities:
+    - Clean and standardize data loaded from CSV staging tables.
+    - Deduplicate records using DISTINCT and ROW_NUMBER().
+    - Populate all dimension and fact tables in the core schema.
+    - Maintain referential integrity by ensuring IDs and text fields are valid.
+    - Update existing records on conflict (upsert behavior).
+
+  Workflow:
+    1. Seed all dimension tables (dim_*).
+    2. Load employees with organization hierarchy references.
+    3. Insert psychometric, PAPI, strengths, performance, and competency data.
+    4. Run quick row count summary and orphan key validation at the end.
+
+  Usage:
+    Run this after executing 02_load_staging_from_csv.sql.
+    Example:
+        psql -U postgres -d your_database -f sql/03_transform_to_core.sql
+
+  Notes:
+    - Uses TRIM, NULLIF, and UPPER for normalization.
+    - Uses ON CONFLICT DO UPDATE to avoid duplicate inserts.
+    - The orphan check at the end should return all zeros.
+*/
 \set ON_ERROR_STOP on
 
 BEGIN;

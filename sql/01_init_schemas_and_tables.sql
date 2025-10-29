@@ -1,3 +1,27 @@
+/*
+  File: 01_init_schemas_and_tables.sql
+  ------------------------------------
+  Purpose:
+    Initialize schemas and create all base tables for the Talent Match Intelligence project.
+
+  Responsibilities:
+    - Drop existing schemas (mart, core, staging) to ensure a clean setup.
+    - Recreate staging, core, and mart schemas.
+    - Define dimension and fact tables across the core schema.
+    - Create staging tables mirroring the core structure for raw data ingestion.
+    - Provide sanity check query at the end to confirm successful creation.
+
+  Usage:
+    Run this script once after connecting to your Supabase/PostgreSQL instance.
+    Example:
+        psql -U postgres -d your_database -f sql/01_init_schemas_and_tables.sql
+
+  Notes:
+    - Uses `\set ON_ERROR_STOP on` to ensure the script stops on any error.
+    - Compatible with PostgreSQL on Supabase; no engine-specific syntax.
+    - Intended for Step 0 (Data Preparation) before running analytic steps.
+*/
+
 \set ON_ERROR_STOP on
 
 BEGIN;

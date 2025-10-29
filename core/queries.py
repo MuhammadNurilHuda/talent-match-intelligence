@@ -1,16 +1,21 @@
 """
 queries.py
------------
-Menyimpan query SQL mentah yang sering dipakai.
-Tujuan: menjaga pemisahan antara logika Python dan SQL.
+----------
+Centralized repository for reusable raw SQL query strings.
 
-Termasuk:
-- Q_PERF_ALL, Q_COMP_ALL   : ambil data performa & kompetensi tahunan.
-- Q_DIM_COMP_PILLARS       : label pilar kompetensi.
-- Q_EMP_ORG                : metadata karyawan (grade, pendidikan, masa kerja).
+Purpose:
+Maintain separation between Python business logic and SQL logic.
+
+Includes:
+- Q_PERF_ALL, Q_COMP_ALL     : Fetch yearly performance and competency data.
+- Q_DIM_COMP_PILLARS         : Retrieve competency pillar labels.
+- Q_EMP_ORG                  : Fetch employee metadata (grade, education, years of service).
+- Q_PAPI, Q_PSYCH            : Retrieve PAPI and psychometric assessment tables.
 """
 
-# Kompetensi & label performa
+# ---------------------------------------------------------------------------
+# Performance and Competency Data
+# ---------------------------------------------------------------------------
 Q_PERF_ALL = """
 SELECT employee_id, year, rating
 FROM core.performance_yearly;
@@ -21,26 +26,34 @@ SELECT employee_id, pillar_code, year, score
 FROM core.competencies_yearly;
 """
 
-# Mapping label pilar
+# ---------------------------------------------------------------------------
+# Competency Pillar Labels
+# ---------------------------------------------------------------------------
 Q_DIM_COMP_PILLARS = """
 SELECT pillar_code, pillar_label
 FROM core.dim_competency_pillars;
 """
 
-# Konteks org (jika dibutuhkan slicing nanti)
+# ---------------------------------------------------------------------------
+# Organizational Context (for future slicing and contextual analysis)
+# ---------------------------------------------------------------------------
 Q_EMP_ORG = """
 SELECT employee_id, fullname, years_of_service_months,
        grade_id, education_id, major_id
 FROM core.employees;
 """
 
-# Ambil tabel PAPI
+# ---------------------------------------------------------------------------
+# PAPI Behavioral Scales
+# ---------------------------------------------------------------------------
 Q_PAPI = """
 SELECT employee_id, scale_code, score
 FROM core.papi_scores;
 """
 
-# Ambil tabel profiles_psych
+# ---------------------------------------------------------------------------
+# Psychometric Profiles
+# ---------------------------------------------------------------------------
 Q_PSYCH = """
 SELECT employee_id, pauli, faxtor, disc, mbti, iq, gtq, tiki
 FROM core.profiles_psych;

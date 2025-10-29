@@ -1,3 +1,25 @@
+/*
+  File: 02_load_staging_from_csv.sql
+  ----------------------------------
+  Purpose:
+    Load all staging tables from pre-exported CSV files for the Talent Match Intelligence project.
+
+  Responsibilities:
+    - Populate dimension tables (dim_*) from corresponding CSVs.
+    - Load employee and fact/profile data into the staging schema.
+    - Prepare consistent data for Step 1 (Exploratory Analysis) and Step 2 (SQL Logic Design).
+
+  Usage:
+    Run this script after executing 01_init_schemas_and_tables.sql.
+    Example:
+        psql -U postgres -d your_database -f sql/02_load_staging_from_csv.sql
+
+  Notes:
+    - Each \copy command expects CSVs to exist in the `staging_csv/` folder.
+    - The CSV files must include headers matching the listed columns.
+    - This script halts immediately if any load fails (`\set ON_ERROR_STOP on`).
+*/
+
 \set ON_ERROR_STOP on
 
 -- ==== DIM ====
